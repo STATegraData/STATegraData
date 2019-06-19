@@ -1,0 +1,21 @@
+#######################################################################
+#######         PRE-PROCESSING RRBS STATegra DATA          #######       
+#######################################################################
+
+## By David Gomez-Cabrero; david.gomez.cabrero@navarra.es  & Sonia Tarazona; & Carlos Company
+
+
+# Raw data are available at GEO, GSE75393
+
+   #######################################################################
+####  THIS PORTION OF THE SCRIPT IS RUN IN HPC CLUSTER WITH A .SH SCRIPT ####
+#############################################################################
+
+# Removed adapters using tim_galore for each sample ($element) 
+trim_galore -s 10 --phred64 -q 20 --paired -1 $element_1.fq -2 $element_2.fq  
+
+# PE Samples alignment ($element)  against mm10 genome  using Bismarck ( * previous conversion to bismark index )  
+bismark --bowtie2 -p 2 --phred64-quals -q mm10_bowtie2/ -1 $element.fq -2 $element.fq
+
+# Methylation Calling
+bismark_methylation_extractor --bedGraph --comprehensive *.sam -o bismarkCalling

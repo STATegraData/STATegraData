@@ -1,0 +1,73 @@
+#######################################################################
+#######         PRE-PROCESSING ChIP-seq STATegra DATA          #######       
+#######################################################################
+
+## By Sonia Tarazona and David Gomez-Cabrero
+
+# Raw data are available at GEO, GSE38200
+
+####  THIS PORTION OF THE SCRIPT IS RUN IN HPC CLUSTER WITH A .SH SCRIPT ####
+#############################################################################
+
+## Step 1: Mapping files to reference genome
+
+######### VERSIONS OF THE GENOME USED:
+Reference Mus Musculus:
+  version: GRCm38
+fasta file downloaded: archive-2013-03-06-18-22-36
+Genes: genes.gtf
+
+######### VERSIONS OF THE SOFTWARE
+samtools version 0.1.18
+bowtie2  version 2
+
+## Step 1: Mapping reads to genome
+bowtie2 —S v 2 -k 1 -m 1 —best -strata mm10 -1 <sample>_Read1.fastq.gz -2 <sample>_Read2.fastq <sample>.sam
+
+## Step 2: Identification of peaks.
+# It was run using CLCbio Peak Finder tool as it was in 2015.
+# For each condition, Endogenous and non-endogenous Ikaros, peaks 
+# were identified:
+# - with the default parameters.
+# - using the control libraries.
+# - FDR < 0.01 for significance.
+# All peaks from all analysis were merged.
+
+## Step 3: Quantification of peaks: using ht-seq
+htseq-count -a 20 -m union -q <PATH_out>/<name_sample>_ready.sam <peaks_in.bed> > <PATH_out>/<name_sample>.htseq.union.gtf
+# By merging all counts a ChIPcounts_consensus.txt file was generated.
+
+
+#### THIS PORTION OF THE SCRIPT IS RUN IN R USING A .R SCRIPT ####
+##################################################################
+
+## LIBRARIES TO USE
+library(NOISeq)
+
+# Reading file with region raw counts -----------------------------------
+
+dades = read.delim("ChIPcounts_consensus.txt", header = TRUE, as.is = TRUE)
+
+# Transforming counts to counts per million reads -------------------------
+
+cpmdades = rpkm(dades)
+
+# Correcting data with input ----------------------------------------------
+
+myinput12 = rowMeans(cpmdades[, 5:6])
+myinput3 = cpmdades[, 7]
+
+finaldades = cpmdades[,1:4] 
+finaldades[,1:2] = apply(finaldades[,1:2], 2, function (x) { x - myinput12 })
+finaldades[,3:4] = apply(finaldades[,3:4], 2, function (x) { x - myinput3 })
+
+finaldades[which(finaldades < 0)] = 0
+## Peaks with 0 in all samples occur because counts in input are higher and then negative numbers are replaced by 0 --> 4003 peaks
+length(which(rowSums(finaldades) == 0))
+
+
+write.table(finaldades, file = "STAT_CPM_ChIPseq.txt", col.names = TRUE, row.names = TRUE, quote = FALSE, sep = "\t")
+
+
+
+
